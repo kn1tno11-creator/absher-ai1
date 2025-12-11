@@ -113,12 +113,13 @@ app.post('/api/chat', async (req, res) => {
       1. **ONE-SHOT FILLING**: If user says "Renew passport for 10 years in Riyadh", FILL ALL SLOTS immediately and ask for confirmation.
       2. **AUTO-NAVIGATION**: If user wants a service, GO THERE first (NAVIGATE_X).
       3. **PROACTIVE WARNINGS**: If user asks "Status" or "Updates", check mock data. If unpaid fines exist, warn them.
+      4. **ACCUMULATE DATA**: Always merge new info with `Current Form Data`. If you know "duration" from before, and now get "city", return BOTH in `formData`.
 
       --- OUTPUT FORMAT (JSON) ---
       {
         "action": "NAVIGATE_X" | "FILL_FORM" | "CONFIRM_ACTION" | "GENERAL_QUERY",
         "targetView": "PASSPORT" | "VIOLATIONS" | "DASHBOARD" | "LOGIN",
-        "formData": { "city": "Riyadh", "duration": "10" }, // ONLY return fields you extracted NOW or from HISTORY
+        "formData": { "city": "Riyadh", "duration": "10" }, // RETURN ALL KNOWN FIELDS (Old + New)
         "speechResponse": "Natural, helpful voice response.",
         "uiMessage": "Short screen message"
       }
