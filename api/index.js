@@ -58,9 +58,92 @@ app.post('/api/tts', async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
-
-// Chat Endpoint
 app.post('/api/chat', async (req, res) => {
+  try {
+    // Your existing code...
+    const { transcript, context, lang } = req.body;
+    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+
+    if (!apiKey) {
+        console.error("GEMINI_API_KEY is missing in environment variables.");
+        return res.status(500).json({ error: "Server configuration error: Missing API Key" });
+    }
+
+    const ai = new GoogleGenAI({ apiKey: apiKey });
+
+    const systemPrompt = `
+      You are the intelligent Voice Assistant for 'Absher', the Saudi government services portal.
+      Your persona: Professional, polite, efficient, and secure.
+      
+      Current User: Mohammed Al-Saud (ID: 1056789012).
+      Current View: ${context.view}.
+      User Language: ${lang}.
+      Mock Data: ${JSON.stringify(context.formData)}. 
+
+      User Input: "${transcript}"
+
+      Instructions:
+      1. Analyze the user's intent. The user might speak English or Arabic (transliterated or script).
+      2. Determine the Action: 
+         - LOGIN (if in LOGIN view and user wants to enter)
+         - NAVIGATE_[VIEW_NAME]
+         - FILL_FORM (extract entities like city, duration, numbers)
+         - CONFIRM_ACTION
+         - GENERAL_QUERY
+      3. Generate a response in the SAME LANGUAGE as the User Input.
+         - If user speaks Arabic, reply in Arabic.
+         - If user speaks English, reply in English.
+      4. Return strict JSON.
+
+      JSON Schema:
+      {
+        "action": "string",
+        "targetView": "string (optional)",
+        "formData": "object (optional key-value pairs e.g. {city: 'Riyadh'})",
+        "speechResponse": "string",
+        "uiMessage": "string (shorter version for display)"
+      }
+    `;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: systemPrompt,
+      config: {
+        responseMimeType: 'application/json',
+      }
+    });
+    // Log the raw response for debugging
+    console.log("Raw Gemini response:", JSON.stringify(response, null, 2));
+     let responseText = '';
+    if (typeof response.text === 'function') {
+        responseText = response.text();
+    } else if (typeof response.text === 'string') {
+        responseText = response.text;
+    } else if (response.candidates && response.candidates[0]?.content?.parts?.[0]?.text) {
+        responseText = response.candidates[0].content.parts[0].text;
+    } else {
+        console.error("Unexpected Gemini response structure:", JSON.stringify(response, null, 2));
+        throw new Error("Failed to extract text from Gemini response");
+    }
+
+    const result = JSON.parse(responseText);
+    res.json(result);
+    
+    // Rest of your code...
+  } catch (error) {
+    console.error("Server Chat Error", error);
+    // Include more details in your error response
+    res.status(500).json({ 
+        action: "ERROR",
+        speechResponse: "Sorry, I encountered an error processing your request.",
+        uiMessage: "Error processing request",
+        debugError: error.message,
+        debugStack: error.stack
+    });
+  }
+});
+// Chat Endpoint
+/*app.post('/api/chat', async (req, res) => {
   try {
     const { transcript, context, lang } = req.body;
     const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
@@ -114,7 +197,19 @@ app.post('/api/chat', async (req, res) => {
       }
     });
     
-    const result = JSON.parse(response.text());
+    let responseText = '';
+    if (typeof response.text === 'function') {
+        responseText = response.text();
+    } else if (typeof response.text === 'string') {
+        responseText = response.text;
+    } else if (response.candidates && response.candidates[0]?.content?.parts?.[0]?.text) {
+        responseText = response.candidates[0].content.parts[0].text;
+    } else {
+        console.error("Unexpected Gemini response structure:", JSON.stringify(response, null, 2));
+        throw new Error("Failed to extract text from Gemini response");
+    }
+
+    const result = JSON.parse(responseText);
     res.json(result);
 
   } catch (error) {
@@ -122,10 +217,12 @@ app.post('/api/chat', async (req, res) => {
     res.status(500).json({ 
         action: "ERROR",
         speechResponse: "Sorry, I encountered an error processing your request.",
-        uiMessage: "Error processing request"
+        uiMessage: "Error processing request",
+        debugError: error.message,
+        debugStack: error.stack
     });
   }
-});
+});*/
 
 // Export the app for Vercel
 export default app;
