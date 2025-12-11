@@ -1,10 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
-// import { GoogleGenAI } from "@google/genai"; // Removed client-side SDK
 
-// --- Configuration ---
-// const ELEVENLABS_API_KEY = "sk_ca4eb8ba5d7ed2243d59fc8270bca7c59f02b34b1503a269"; // Removed
-// const ELEVENLABS_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"; // Moved to backend
 const USER_NAME_EN = "Mohammed Al-Saud";
 const USER_NAME_AR = "محمد آل سعود";
 const USER_ID = "1056789012";
@@ -114,6 +110,13 @@ const speakText = async (text: string, lang: Language) => {
 
 const processVoiceCommand = async (transcript: string, currentContext: any, lang: Language) => {
   try {
+    // Log what we're sending to help with debugging
+    console.log('Sending to API:', {
+      transcript,
+      context: currentContext,
+      lang
+    });
+
     const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -126,19 +129,26 @@ const processVoiceCommand = async (transcript: string, currentContext: any, lang
         })
     });
 
-    if (!response.ok) throw new Error('Backend API Failed');
+    if (!response.ok) {
+      // Try to get more detailed error information from the response
+      const errorText = await response.text();
+      console.error(`API Error (${response.status}):`, errorText);
+      throw new Error(`Backend API Failed: ${response.status} - ${errorText || 'No error details'}`);
+    }
 
     return await response.json();
   } catch (e) {
     console.error("Gemini Error", e);
     return {
       action: "ERROR",
-      speechResponse: lang === 'ar-SA' ? "عذراً، لم أتمكن من فهم ذلك. الرجاء المحاولة مرة أخرى." : "I'm sorry, I didn't catch that.",
-      uiMessage: "Error processing request"
+      speechResponse: lang === 'ar-SA' ? 
+        "عذراً، لم أتمكن من فهم ذلك. الرجاء المحاولة مرة أخرى." : 
+        "I'm sorry, I couldn't process that request.",
+      uiMessage: "Error processing request",
+      debug: e.message // Include error message for debugging
     };
   }
 };
-
 // --- UI Components ---
 
 const Header = ({ user, toggleContrast, isHighContrast, lang, setLang, notifications }: any) => {
