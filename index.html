@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Absher</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script type="module" src="/index.tsx"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap');
+        
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+        
+        /* Accessibility */
+        .high-contrast {
+            filter: contrast(1.4) saturate(1.1);
+        }
+        .high-contrast .bg-absher-green {
+            background-color: #004d3a !important;
+        }
+        .high-contrast * {
+             border-color: #000 !important;
+        }
+        
+        /* Animations */
+        .mic-pulse {
+            box-shadow: 0 0 0 0 rgba(0, 127, 95, 0.7);
+            animation: pulse-green 1.5s infinite cubic-bezier(0.66, 0, 0, 1);
+        }
+        
+        @keyframes pulse-green {
+            to {
+                box-shadow: 0 0 0 20px rgba(0, 127, 95, 0);
+            }
+        }
+
+        .voice-wave {
+            display: flex;
+            align-items: center;
+            height: 20px;
+            gap: 3px;
+        }
+        
+        .voice-wave-bar {
+            width: 4px;
+            background: #fff;
+            animation: wave 1s ease-in-out infinite;
+        }
+        
+        .voice-wave-bar:nth-child(1) { animation-delay: 0.0s; height: 10px; }
+        .voice-wave-bar:nth-child(2) { animation-delay: 0.1s; height: 15px; }
+        .voice-wave-bar:nth-child(3) { animation-delay: 0.2s; height: 20px; }
+        .voice-wave-bar:nth-child(4) { animation-delay: 0.1s; height: 15px; }
+        .voice-wave-bar:nth-child(5) { animation-delay: 0.0s; height: 10px; }
+
+        @keyframes wave {
+            0%, 100% { transform: scaleY(1); }
+            50% { transform: scaleY(1.5); }
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .fade-in-up {
+            animation: fadeInUp 0.4s ease-out forwards;
+        }
+        
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'absher-green': '#007F5F',
+              'absher-dark': '#005f46',
+              'absher-light': '#E6F2EF',
+              'absher-gold': '#C5A065',
+              'vision-blue': '#006C35', // Approximating the green used in Vision 2030 often
+            },
+            fontFamily: {
+                sans: ['Tajawal', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
+    <script type="importmap">
+    {
+      "imports": {
+        "react/": "https://aistudiocdn.com/react@^19.2.0/",
+        "react": "https://aistudiocdn.com/react@^19.2.0",
+        "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+        "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0"
+      }
+    }
+    </script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-gray-50 text-gray-800 antialiased selection:bg-absher-green selection:text-white">
+    <div id="root"></div>
+  </body>
+</html>
