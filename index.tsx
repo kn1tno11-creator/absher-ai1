@@ -5,8 +5,8 @@ import { createRoot } from 'react-dom/client';
 // --- Configuration ---
 // const ELEVENLABS_API_KEY = "sk_ca4eb8ba5d7ed2243d59fc8270bca7c59f02b34b1503a269"; // Removed
 // const ELEVENLABS_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"; // Moved to backend
-const USER_NAME_EN = "Mohammed Al-Saud";
-const USER_NAME_AR = "محمد آل سعود";
+const USER_NAME_EN = "Hadeel Al-shehri";
+const USER_NAME_AR = "هديل الشهري";
 const USER_ID = "1056789012";
 
 // --- Types & Mock Data ---
@@ -112,8 +112,15 @@ const speakText = async (text: string, lang: Language) => {
   }
 };
 
-const processVoiceCommand = async (transcript: string, currentContext: any, lang: Language) => {
+const processVoiceCommand = async (transcript: string, currentContext: any, lang: Language, history: any[]) => {
   try {
+    // Log what we're sending to help with debugging
+    console.log('Sending to API:', {
+      transcript,
+      context: currentContext,
+      lang
+    });
+
     const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -122,23 +129,31 @@ const processVoiceCommand = async (transcript: string, currentContext: any, lang
         body: JSON.stringify({
             transcript,
             context: currentContext,
-            lang
+            lang,
+            history
         })
     });
 
-    if (!response.ok) throw new Error('Backend API Failed');
+    if (!response.ok) {
+      // Try to get more detailed error information from the response
+      const errorText = await response.text();
+      console.error(`API Error (${response.status}):`, errorText);
+      throw new Error(`Backend API Failed: ${response.status} - ${errorText || 'No error details'}`);
+    }
 
     return await response.json();
   } catch (e) {
     console.error("Gemini Error", e);
     return {
       action: "ERROR",
-      speechResponse: lang === 'ar-SA' ? "عذراً، لم أتمكن من فهم ذلك. الرجاء المحاولة مرة أخرى." : "I'm sorry, I didn't catch that.",
-      uiMessage: "Error processing request"
+      speechResponse: lang === 'ar-SA' ? 
+        "عذراً، لم أتمكن من فهم ذلك. الرجاء المحاولة مرة أخرى." : 
+        "I'm sorry, I couldn't process that request.",
+      uiMessage: "Error processing request",
+      debug: e.message // Include error message for debugging
     };
   }
 };
-
 // --- UI Components ---
 
 const Header = ({ user, toggleContrast, isHighContrast, lang, setLang, notifications }: any) => {
@@ -449,10 +464,12 @@ const LoginView = ({ lang, onLogin, isHighContrast }: any) => {
                                  <span className="text-sm font-bold">"{lang === 'ar-SA' ? 'تسجيل الدخول' : 'Login'}"</span>
                              </div>
                          </div>
+
+
+                         </div>
                      </div>
                  </div>
              </div>
-        </div>
     );
 }
 
@@ -488,7 +505,7 @@ const DashboardView = ({ isHighContrast, data, lang }: any) => {
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
         <div>
            <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
-             {lang === 'ar-SA' ? 'مرحباً، محمد' : 'Good Morning, Mohammed'}
+             {lang === 'ar-SA' ? 'مرحباً، هديل' : 'Good Morning, Hadeel'}
            </h1>
            <p className="text-gray-500 mt-1 flex items-center gap-2 text-sm">
               <span className="w-2 h-2 rounded-full bg-green-500"></span>
@@ -810,6 +827,8 @@ const SettingsView = ({ isHighContrast, lang, setLang }: any) => {
     );
 };
 
+
+
 // --- Main App Container ---
 
 function AbsherApp() {
@@ -822,6 +841,7 @@ function AbsherApp() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastTranscript, setLastTranscript] = useState('');
   const [assistantResponse, setAssistantResponse] = useState('');
+  const [history, setHistory] = useState<any[]>([]);
   
   // UI State
   const [showVerification, setShowVerification] = useState(false);
@@ -913,11 +933,20 @@ function AbsherApp() {
       formData: formData
     };
 
+    // Update history with user input
+    const newHistory = [...history, { role: 'user', content: text }];
+    setHistory(newHistory);
+
     // Call Gemini
-    const result = await processVoiceCommand(text, context, lang);
+    const result = await processVoiceCommand(text, context, lang, newHistory);
     
     setIsProcessing(false);
     setAssistantResponse(result.uiMessage || result.speechResponse);
+    
+    // Update history with AI response
+    if (result.speechResponse) {
+        setHistory(prev => [...prev, { role: 'assistant', content: result.speechResponse }]);
+    }
     
     // Execute Action
     if (result.action === 'LOGIN') {
@@ -986,6 +1015,8 @@ function AbsherApp() {
   const handleLogin = () => {
       setCurrentView('DASHBOARD');
   };
+
+
 
   return (
     <div className={`min-h-screen flex flex-col font-sans selection:bg-absher-green selection:text-white ${isHighContrast ? 'bg-black text-white' : 'bg-gray-50 text-gray-900'}`}>

@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
+import Groq from 'groq-sdk';
 import fetch from 'node-fetch';
 
 dotenv.config();
@@ -58,8 +59,6 @@ app.post('/api/tts', async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
-
-// Chat Endpoint
 app.post('/api/chat', async (req, res) => {
   try {
     const { transcript, context, lang } = req.body;
@@ -70,62 +69,121 @@ app.post('/api/chat', async (req, res) => {
         return res.status(500).json({ error: "Server configuration error: Missing API Key" });
     }
 
-    const ai = new GoogleGenAI({ apiKey: apiKey });
-
     const systemPrompt = `
-      You are the intelligent Voice Assistant for 'Absher', the Saudi government services portal.
-      Your persona: Professional, polite, efficient, and secure.
+      You are the "Absher Smart Assistant", a highly intelligent, proactive, and caring government AI.
+      Your goal is to make the user's life easier by guiding them, summarizing actions, and handling urgent matters.
       
-      Current User: Mohammed Al-Saud (ID: 1056789012).
+      Current User: Hadeel Al-shehri (ID: 1056789012).
       Current View: ${context.view}.
       User Language: ${lang}.
-      Mock Data: ${JSON.stringify(context.formData)}. 
+      Current Form Data: ${JSON.stringify(context.formData)}. 
+      
+      Conversation History:
+      ${JSON.stringify(req.body.history || [])}
 
       User Input: "${transcript}"
 
-      Instructions:
-      1. Analyze the user's intent. The user might speak English or Arabic (transliterated or script).
-      2. Determine the Action: 
-         - LOGIN (if in LOGIN view and user wants to enter)
-         - NAVIGATE_[VIEW_NAME]
-         - FILL_FORM (extract entities like city, duration, numbers)
-         - CONFIRM_ACTION
-         - GENERAL_QUERY
-      3. Generate a response in the SAME LANGUAGE as the User Input.
-         - If user speaks Arabic, reply in Arabic.
-         - If user speaks English, reply in English.
-      4. Return strict JSON.
+      CORE BEHAVIORS:
+      1. **Proactive Guidance**: 
+         - Don't just wait for commands. Guide the user.
+         - If they say "Renew passport", explain the steps: "I can help with that. First, I need to know the duration. Do you want 5 or 10 years?"
+         - If they are on a form, ask for the specific missing field.
+      
+      2. **Operation Summarization (CRITICAL)**:
+         - BEFORE performing any "CONFIRM_ACTION" or critical "FILL_FORM" completion, you MUST summarize.
+         - Example: "I have selected Riyadh as the city and 10 years for the duration. The total fee is 600 Riyals. Shall I proceed to payment?"
+      
+      3. **Urgent Notification Handling**:
+         - If the user asks "What should I do?" or "Any updates?", check the mock data (inferred) or history.
+         - If they have unpaid fines, say: "Attention: You have unpaid traffic violations. I recommend paying them to avoid penalties. Shall I take you to the payment screen?"
+      
+      4. **Smart Navigation**:
+         - If user says "Pay my fines", automatically return action: "NAVIGATE_VIOLATIONS".
+         - If user says "Renew passport", return action: "NAVIGATE_PASSPORT".
 
-      JSON Schema:
+      ACTIONS:
+      - LOGIN: Only if in LOGIN view.
+      - NAVIGATE_[VIEW]: To switch screens (VIOLATIONS, PASSPORT, DASHBOARD, APPOINTMENTS, SETTINGS).
+      - FILL_FORM: Return 'formData' with extracted values.
+      - CONFIRM_ACTION: When user says "Yes" or "Proceed" after a summary.
+      - GENERAL_QUERY: For questions.
+
+      OUTPUT FORMAT (JSON ONLY):
       {
         "action": "string",
         "targetView": "string (optional)",
-        "formData": "object (optional key-value pairs e.g. {city: 'Riyadh'})",
-        "speechResponse": "string",
-        "uiMessage": "string (shorter version for display)"
+        "formData": "object (optional)",
+        "speechResponse": "string (Natural, helpful, polite)",
+        "uiMessage": "string (Short summary for screen)"
       }
     `;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: systemPrompt,
-      config: {
-        responseMimeType: 'application/json',
-      }
-    });
-    
-    const result = JSON.parse(response.text());
-    res.json(result);
+    // --- Attempt 1: Gemini ---
+    try {
+        const ai = new GoogleGenAI({ apiKey: apiKey });
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: systemPrompt,
+          config: {
+            responseMimeType: 'application/json',
+          }
+        });
+        
+        console.log("Raw Gemini response:", JSON.stringify(response, null, 2));
+        let responseText = '';
+        if (typeof response.text === 'function') {
+            responseText = response.text();
+        } else if (typeof response.text === 'string') {
+            responseText = response.text;
+        } else if (response.candidates && response.candidates[0]?.content?.parts?.[0]?.text) {
+            responseText = response.candidates[0].content.parts[0].text;
+        } else {
+            throw new Error("Failed to extract text from Gemini response");
+        }
+
+        const result = JSON.parse(responseText);
+        return res.json(result);
+
+    } catch (geminiError) {
+        console.error("Gemini Failed, attempting fallback:", geminiError.message);
+        
+        // --- Attempt 2: Groq Fallback ---
+        if (!process.env.GROQ_API_KEY) {
+            throw new Error("Gemini failed and GROQ_API_KEY is missing for fallback.");
+        }
+
+        const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+        const completion = await groq.chat.completions.create({
+            messages: [
+                { role: "system", content: systemPrompt + "\n\nIMPORTANT: Respond ONLY with valid JSON." },
+                { role: "user", content: transcript } // In a real chat, we'd pass history, but here we just pass the prompt/transcript
+            ],
+            model: "llama3-8b-8192",
+            temperature: 0.5,
+            response_format: { type: "json_object" }
+        });
+
+        const groqResponseText = completion.choices[0]?.message?.content;
+        if (!groqResponseText) throw new Error("Groq returned empty response");
+
+        console.log("Groq Response:", groqResponseText);
+        const result = JSON.parse(groqResponseText);
+        return res.json(result);
+    }
 
   } catch (error) {
-    console.error("Server Chat Error", error);
+    console.error("Server Chat Error (All attempts failed)", error);
     res.status(500).json({ 
         action: "ERROR",
         speechResponse: "Sorry, I encountered an error processing your request.",
-        uiMessage: "Error processing request"
+        uiMessage: "Error processing request",
+        debugError: error.message,
+        debugStack: error.stack
     });
   }
 });
+// Chat Endpoint
+
 
 // Export the app for Vercel
 export default app;
