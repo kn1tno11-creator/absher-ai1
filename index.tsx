@@ -960,9 +960,7 @@ function AbsherApp() {
     if (result.action === 'NAVIGATE_APPOINTMENTS') setCurrentView('APPOINTMENTS');
     if (result.action === 'NAVIGATE_SETTINGS') setCurrentView('SETTINGS');
     
-    // ALWAYS update form data if provided (fixes amnesia bug)
-    if (result.formData) {
-       console.log("Updating Form Data:", result.formData);
+    if (result.action === 'FILL_FORM' && result.formData) {
        setFormData((prev: any) => ({ ...prev, ...result.formData }));
     }
 
