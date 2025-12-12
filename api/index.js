@@ -15,7 +15,7 @@ app.use(cors());
 app.use(express.json());
 
 // --- Configuration ---
-const ELEVENLABS_API_KEY = "sk_ca4eb8ba5d7ed2243d59fc8270bca7c59f02b34b1503a269"; // Moved from frontend
+const ELEVENLABS_API_KEY = "sk_45327982fa4bf297394826682d78ca5e765ff7650bd6d93d"; // Moved from frontend
 const ELEVENLABS_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
 
 // --- Routes ---
